@@ -1,74 +1,58 @@
-module traffic_light_controller(
-    input wire clk,         // Clock input
-    input wire rst,         // Reset input
-    output reg [2:0] main_road, // Traffic lights for main road (Red, Yellow, Green)
-    output reg [2:0] side_road  // Traffic lights for side road (Red, Yellow, Green)
+module traffic_light_controller_4way(
+    input wire clk,
+    input wire rst,
+    output reg [2:0] north,
+    output reg [2:0] south,
+    output reg [2:0] east,
+    output reg [2:0] west
 );
+    parameter NS_GREEN   = 3'd0;
+    parameter NS_YELLOW  = 3'd1;
+    parameter EW_GREEN   = 3'd2;
+    parameter EW_YELLOW  = 3'd3;
+    parameter ALL_RED    = 3'd4;
 
-    // State Encoding (Without typedef)
-    parameter RED_MAIN    = 3'b000;
-    parameter YELLOW_MAIN = 3'b001;
-    parameter GREEN_MAIN  = 3'b010;
-    parameter RED_SIDE    = 3'b011;
-    parameter YELLOW_SIDE = 3'b100;
-    parameter GREEN_SIDE  = 3'b101;
+    reg [2:0] current_state, next_state, prev_state;
+    reg [31:0] counter;
 
-    reg [2:0] current_state, next_state;
-    reg [31:0] counter;  // Timer counter
+    parameter TIME_GREEN  = 5_000_000;
+    parameter TIME_YELLOW = 2_000_000;
+    parameter TIME_ALL_RED = 1_000_000;
 
-    parameter TIME_RED    = 5_000_000;  // Example delay for RED state
-    parameter TIME_YELLOW = 2_000_000;  // Example delay for YELLOW state
-    parameter TIME_GREEN  = 5_000_000;  // Example delay for GREEN state
-
-    // State Transition Logic (Sequential)
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            current_state <= RED_MAIN; // Start with RED on Main Road
+            current_state <= NS_GREEN;
+            prev_state <= NS_GREEN;
             counter <= 0;
         end else begin
-            if (counter >= TIME_RED && (current_state == RED_MAIN || current_state == RED_SIDE)) 
+            if (counter >= TIME_GREEN && (current_state == NS_GREEN || current_state == EW_GREEN)) begin
                 counter <= 0;
-            else if (counter >= TIME_YELLOW && (current_state == YELLOW_MAIN || current_state == YELLOW_SIDE))
+                prev_state <= current_state;
+                current_state <= (current_state == NS_GREEN) ? NS_YELLOW : EW_YELLOW;
+            end else if (counter >= TIME_YELLOW && (current_state == NS_YELLOW || current_state == EW_YELLOW)) begin
                 counter <= 0;
-            else if (counter >= TIME_GREEN && (current_state == GREEN_MAIN || current_state == GREEN_SIDE))
+                prev_state <= current_state;
+                current_state <= ALL_RED;
+            end else if (counter >= TIME_ALL_RED && current_state == ALL_RED) begin
                 counter <= 0;
-            else
+                current_state <= (prev_state == NS_YELLOW) ? EW_GREEN : NS_GREEN;
+            end else begin
                 counter <= counter + 1;
-            
-            current_state <= next_state;
+            end
         end
     end
 
-    // Next State Logic (Combinational)
     always @(*) begin
-        case (current_state)
-            RED_MAIN:    
-                next_state = (counter >= TIME_RED) ? YELLOW_MAIN : RED_MAIN;
-            YELLOW_MAIN: 
-                next_state = (counter >= TIME_YELLOW) ? GREEN_MAIN : YELLOW_MAIN;
-            GREEN_MAIN:  
-                next_state = (counter >= TIME_GREEN) ? RED_SIDE : GREEN_MAIN;
-            RED_SIDE:    
-                next_state = (counter >= TIME_RED) ? YELLOW_SIDE : RED_SIDE;
-            YELLOW_SIDE: 
-                next_state = (counter >= TIME_YELLOW) ? GREEN_SIDE : YELLOW_SIDE;
-            GREEN_SIDE:  
-                next_state = (counter >= TIME_GREEN) ? RED_MAIN : GREEN_SIDE;
-            default:     
-                next_state = RED_MAIN;
-        endcase
-    end
+        north = 3'b100; 
+        south = 3'b100;
+        east = 3'b100;
+        west = 3'b100;
 
-    // Output Logic (Traffic Light Control)
-    always @(*) begin
         case (current_state)
-            RED_MAIN:    begin main_road = 3'b100; side_road = 3'b001; end // Red Main, Green Side
-            YELLOW_MAIN: begin main_road = 3'b010; side_road = 3'b100; end // Yellow Main, Red Side
-            GREEN_MAIN:  begin main_road = 3'b001; side_road = 3'b100; end // Green Main, Red Side
-            RED_SIDE:    begin main_road = 3'b001; side_road = 3'b100; end // Green Main, Red Side
-            YELLOW_SIDE: begin main_road = 3'b100; side_road = 3'b010; end // Red Main, Yellow Side
-            GREEN_SIDE:  begin main_road = 3'b100; side_road = 3'b001; end // Red Main, Green Side
-            default:     begin main_road = 3'b100; side_road = 3'b100; end // Default to Red on both
+            NS_GREEN: begin north = 3'b001; south = 3'b001; end
+            NS_YELLOW: begin north = 3'b010; south = 3'b010; end
+            EW_GREEN: begin east = 3'b001; west = 3'b001; end
+            EW_YELLOW: begin east = 3'b010; west = 3'b010; end
         endcase
     end
 
