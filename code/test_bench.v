@@ -1,36 +1,59 @@
-module traffic_light_tb;
+module tb_traffic_light_controller_4way;
+
 
     reg clk;
     reg rst;
-    wire [2:0] main_road;
-    wire [2:0] side_road;
+    wire [2:0] north, south, east, west;
 
-    // Instantiate the DUT (Device Under Test)
-    traffic_light_controller dut (
+
+    traffic_light_controller_4way uut (
         .clk(clk),
         .rst(rst),
-        .main_road(main_road),
-        .side_road(side_road)
+        .north(north),
+        .south(south),
+        .east(east),
+        .west(west)
     );
 
-    // Clock Generation (50MHz)
-    always #10 clk = ~clk; // Toggle clock every 10ns → 50MHz clock
+    always #5 clk = ~clk;
+
+    function [7*8:1] light_color(input [2:0] light);
+        case (light)
+            3'b100: light_color = "RED";
+            3'b010: light_color = "YELLOW";
+            3'b001: light_color = "GREEN";
+            default: light_color = "UNKNOWN";
+        endcase
+    endfunction
+
+    localparam SIM_TIME_NS = 200_000_000;  
 
     initial begin
-        // Initialize signals
-        clk = 0;
-        rst = 1; // Apply reset
-        #100;     // Hold reset for 100ns
-        rst = 0;  // Release reset
+ 
+        $dumpfile("traffic_light_4way.vcd");
+        $dumpvars();
 
-        // Run simulation for a sufficient duration to test all states
-        #200_000_000; // Run for 200ms (adjust based on your FSM timings)
-        $finish;     // End simulation
+       
+        clk = 0;
+        rst = 1;
+        
+        #20;
+        rst = 0;
+
+        #(SIM_TIME_NS);
+
+        $display("Simulation completed.");
+        $finish;
     end
 
-    // Monitor output changes
-    initial begin
-        $monitor("Time=%0t | Main Road = %b | Side Road = %b", $time, main_road, side_road);
+    always @(posedge clk) begin
+        $display("Time: %0t ns | N: %s | S: %s | E: %s | W: %s",
+            $time,
+            light_color(north),
+            light_color(south),
+            light_color(east),
+            light_color(west)
+        );
     end
 
 endmodule
